@@ -1,5 +1,5 @@
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ImageUpload from "@/components/ImageUpload";
@@ -25,8 +25,82 @@ const Index = () => {
   const [width, setWidth] = useState(800);
   const [height, setHeight] = useState(600);
   const [format, setFormat] = useState("jpeg");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+
+  // Generate preview whenever settings change
+  useEffect(() => {
+    if (uploadedImage) {
+      generatePreview();
+    }
+  }, [uploadedImage, width, height, quality, format]);
+
+  const generatePreview = useCallback(() => {
+    if (!uploadedImage) return;
+
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      // Set canvas size to preview dimensions (scaled down for display)
+      const maxPreviewSize = 300;
+      const aspectRatio = width / height;
+      let previewWidth, previewHeight;
+
+      if (aspectRatio > 1) {
+        previewWidth = Math.min(maxPreviewSize, width);
+        previewHeight = previewWidth / aspectRatio;
+      } else {
+        previewHeight = Math.min(maxPreviewSize, height);
+        previewWidth = previewHeight * aspectRatio;
+      }
+
+      canvas.width = previewWidth;
+      canvas.height = previewHeight;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, previewWidth, previewHeight);
+
+      // Calculate aspect ratios for cropping
+      const imgAspect = img.width / img.height;
+      const canvasAspect = width / height;
+
+      let drawWidth, drawHeight, offsetX, offsetY;
+
+      if (imgAspect > canvasAspect) {
+        // Image is wider than canvas ratio
+        drawHeight = img.height;
+        drawWidth = img.height * canvasAspect;
+        offsetX = (img.width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        // Image is taller than canvas ratio
+        drawWidth = img.width;
+        drawHeight = img.width / canvasAspect;
+        offsetX = 0;
+        offsetY = (img.height - drawHeight) / 2;
+      }
+
+      // Draw cropped image to preview canvas
+      ctx.drawImage(
+        img,
+        offsetX, offsetY, drawWidth, drawHeight,
+        0, 0, previewWidth, previewHeight
+      );
+
+      // Convert to data URL for preview
+      const previewDataUrl = canvas.toDataURL(`image/${format}`, quality[0] / 100);
+      setPreviewImage(previewDataUrl);
+    };
+
+    img.src = uploadedImage;
+  }, [uploadedImage, width, height, quality, format]);
 
   const handleImageUpload = useCallback((file: File) => {
     setOriginalFile(file);
@@ -51,6 +125,7 @@ const Index = () => {
   const handleRemoveImage = useCallback(() => {
     setUploadedImage(null);
     setOriginalFile(null);
+    setPreviewImage(null);
     setWidth(800);
     setHeight(600);
   }, []);
@@ -99,20 +174,24 @@ const Index = () => {
 
       if (imgAspect > canvasAspect) {
         // Image is wider than canvas ratio
-        drawHeight = height;
-        drawWidth = height * imgAspect;
-        offsetX = (width - drawWidth) / 2;
+        drawHeight = img.height;
+        drawWidth = img.height * canvasAspect;
+        offsetX = (img.width - drawWidth) / 2;
         offsetY = 0;
       } else {
         // Image is taller than canvas ratio
-        drawWidth = width;
-        drawHeight = width / imgAspect;
+        drawWidth = img.width;
+        drawHeight = img.width / canvasAspect;
         offsetX = 0;
-        offsetY = (height - drawHeight) / 2;
+        offsetY = (img.height - drawHeight) / 2;
       }
 
-      // Draw image (this will crop it to fit)
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+      // Draw cropped image
+      ctx.drawImage(
+        img,
+        offsetX, offsetY, drawWidth, drawHeight,
+        0, 0, width, height
+      );
 
       // Convert to blob and download
       canvas.toBlob((blob) => {
@@ -170,13 +249,19 @@ const Index = () => {
               {/* Preview */}
               {uploadedImage && (
                 <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Preview ({width}x{height}px)</h3>
+                  <h3 className="text-lg font-semibold mb-4">
+                    Preview ({width}x{height}px, {quality[0]}% quality)
+                  </h3>
                   <div className="relative bg-muted rounded-lg p-4 flex items-center justify-center min-h-[200px]">
-                    <img
-                      src={uploadedImage}
-                      alt="Preview"
-                      className="max-w-full max-h-64 object-contain rounded"
-                    />
+                    {previewImage ? (
+                      <img
+                        src={previewImage}
+                        alt="Preview"
+                        className="max-w-full max-h-64 object-contain rounded"
+                      />
+                    ) : (
+                      <div className="text-muted-foreground">Generating preview...</div>
+                    )}
                   </div>
                 </Card>
               )}
@@ -239,8 +324,9 @@ const Index = () => {
         </div>
       </main>
 
-      {/* Hidden canvas for image processing */}
+      {/* Hidden canvases for image processing */}
       <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={previewCanvasRef} className="hidden" />
       
       <Footer />
     </div>
