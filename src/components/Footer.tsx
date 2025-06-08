@@ -56,10 +56,6 @@ const Footer = () => {
               </a>
             </Button>
           </div>
-          
-          <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; 2024 NAUTBOL. Made with ❤️ for the community.</p>
-          </div>
         </div>
       </div>
     </footer>
