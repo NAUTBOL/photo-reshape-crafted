@@ -1,8 +1,33 @@
 
 import { Twitter, Linkedin, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { API_URL } from "@/core/config";
+import { useState, useEffect } from "react";
 
 const Footer = () => {
+  const [counter, setCounter] = useState(0);
+
+  const fetchCounterData = async () => {
+    const url = API_URL + "counters/total/resize";
+    const response = await fetch(url);
+    if (!response.ok) {
+      setCounter(0);
+    }
+    const data = await response.json();
+    setCounter(data.counter);
+  };
+
+  const formatViews = (num: number) => {
+    return new Intl.NumberFormat('en', {
+      notation: 'compact',
+      compactDisplay: 'short',
+    }).format(num);
+  };
+
+  useEffect(() => {
+    fetchCounterData();
+  }, []);
+
   return (
     <footer className="border-t border-border/40 bg-background">
       <div className="container max-w-screen-2xl py-8">
@@ -23,7 +48,7 @@ const Footer = () => {
                 <Twitter className="h-5 w-5" />
               </a>
             </Button>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -39,7 +64,7 @@ const Footer = () => {
                 <Linkedin className="h-5 w-5" />
               </a>
             </Button>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -56,6 +81,11 @@ const Footer = () => {
               </a>
             </Button>
           </div>
+          <p className="text-lg sm:text-xl font-bold">
+            <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              Loved by +{formatViews(counter)}
+            </span>
+          </p>
         </div>
       </div>
     </footer>
